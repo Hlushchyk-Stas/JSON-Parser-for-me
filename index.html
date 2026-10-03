@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Unicode Декодер у Кирилицю</title>
+  <title>JSON Parser & Timestamps Extractor</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -52,17 +52,16 @@
 
     .container {
       width: 100%;
-      max-width: 1080px;
+      max-width: 1100px;
       display: flex;
       flex-direction: column;
-      gap: 24px;
+      gap: 20px;
     }
 
     header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding-bottom: 8px;
     }
 
     .title-group h1 {
@@ -85,12 +84,8 @@
       border-radius: 8px;
       cursor: pointer;
       font-size: 14px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
     }
 
-    /* Drag & Drop Zone */
     .dropzone {
       border: 2px dashed var(--border);
       background: var(--card-bg);
@@ -123,7 +118,6 @@
       color: var(--primary);
     }
 
-    /* Grid Layout */
     .editor-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -154,11 +148,14 @@
       font-size: 13px;
       font-weight: 600;
       color: var(--text-muted);
+      flex-wrap: wrap;
+      gap: 8px;
     }
 
     .actions {
       display: flex;
       gap: 8px;
+      align-items: center;
     }
 
     .btn-action {
@@ -170,19 +167,27 @@
       font-size: 12px;
       font-weight: 500;
       cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 4px;
     }
 
     .btn-action:hover {
       border-color: var(--text-muted);
-      background: rgba(255, 255, 255, 0.03);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .format-select {
+      background: var(--card-bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 5px 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      outline: none;
+      cursor: pointer;
     }
 
     textarea {
       width: 100%;
-      height: 380px;
+      height: 420px;
       border: none;
       background: transparent;
       padding: 16px;
@@ -227,10 +232,10 @@
   <div class="container">
     <header>
       <div class="title-group">
-        <h1>Декодер Unicode-послідовностей</h1>
-        <p>Миттєве перетворення <code>\u04XX</code> у нормальні літери кирилиці</p>
+        <h1>Парсер субтитрів & таймкодів</h1>
+        <p>Витягує чистий текст із таймкодами та прибирає зайві блоки JSON</p>
       </div>
-      <button class="theme-btn" id="themeToggle" onclick="toggleTheme()">🌓 Тема</button>
+      <button class="theme-btn" onclick="toggleTheme()">🌓 Тема</button>
     </header>
 
     <div class="dropzone" id="dropArea">
@@ -241,61 +246,94 @@
     </div>
 
     <div class="editor-grid">
-      <!-- Вхідні дані -->
       <div class="card">
         <div class="card-header">
-          <span>Вхідний JSON / Текст</span>
+          <span>Вхідний сирий JSON</span>
           <div class="actions">
             <button class="btn-action" onclick="clearInput()">Очистити</button>
           </div>
         </div>
-        <textarea id="inputText" placeholder='Вставте сюди текст на зразок: {"text": "\u0414\u043e\u0431\u0440\u043e"}'></textarea>
+        <textarea id="inputText" placeholder="Вставте сирий JSON з сегментами сюди..."></textarea>
       </div>
 
-      <!-- Результат -->
       <div class="card">
         <div class="card-header">
-          <span>Результат (Кирилиця)</span>
+          <span>Очищений текст</span>
           <div class="actions">
+            <select class="format-select" id="formatSelect" onchange="processText()">
+              <option value="clean">Тільки [ХХ:ХХ] Текст</option>
+              <option value="raw_json">Повний очищений JSON</option>
+            </select>
             <button class="btn-action" onclick="copyResult()">Скопіювати</button>
-            <button class="btn-action" onclick="downloadResult()">Зберегти файл</button>
+            <button class="btn-action" onclick="downloadResult()">Зберегти txt</button>
           </div>
         </div>
-        <textarea id="outputText" readonly placeholder="Розкодований результат з'явиться тут автоматично..."></textarea>
+        <textarea id="outputText" readonly placeholder="Тут з'явиться готовий список: [Таймкод] Текст..."></textarea>
       </div>
     </div>
   </div>
 
-  <div id="toast" class="toast">Скопійовано в буфер обміну!</div>
+  <div id="toast" class="toast">Скопійовано!</div>
 
   <script>
     const inputEl = document.getElementById('inputText');
     const outputEl = document.getElementById('outputText');
+    const formatSelect = document.getElementById('formatSelect');
     const toastEl = document.getElementById('toast');
 
-    // Автоматичне декодування під час введення
-    inputEl.addEventListener('input', decode);
+    inputEl.addEventListener('input', processText);
 
-    function decode() {
-      const val = inputEl.value;
-      if (!val.trim()) {
+    // Функція форматування секунд у формат [MM:SS] або [HH:MM:SS]
+    function formatTime(seconds) {
+      const s = Math.floor(seconds);
+      const hrs = Math.floor(s / 3600);
+      const mins = Math.floor((s % 3600) / 60);
+      const secs = s % 60;
+
+      const pad = (n) => String(n).padStart(2, '0');
+
+      if (hrs > 0) {
+        return `[${pad(hrs)}:${pad(mins)}:${pad(secs)}]`;
+      }
+      return `[${pad(mins)}:${pad(secs)}]`;
+    }
+
+    function processText() {
+      let raw = inputEl.value;
+      if (!raw.trim()) {
         outputEl.value = '';
         return;
       }
 
+      // 1. Декодуємо всі \uXXXX послідовності в нормальні літери
+      raw = raw.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) => 
+        String.fromCharCode(parseInt(hex, 16))
+      );
+
       try {
-        // Якщо передано валідний JSON
-        const parsed = JSON.parse(val);
-        outputEl.value = JSON.stringify(parsed, null, 2);
+        const data = JSON.parse(raw);
+        const mode = formatSelect.value;
+
+        // Перевіряємо наявність масиву сегментів
+        const segments = data.segments || (Array.isArray(data) ? data : null);
+
+        if (mode === 'clean' && segments) {
+          const lines = segments.map(seg => {
+            const time = formatTime(seg.start || 0);
+            const text = (seg.text || '').trim();
+            return `${time} ${text}`;
+          });
+          outputEl.value = lines.join('\n');
+        } else {
+          outputEl.value = JSON.stringify(data, null, 2);
+        }
       } catch (e) {
-        // Якщо це не повний JSON, а фрагмент тексту з \uXXXX
-        outputEl.value = val.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) => 
-          String.fromCharCode(parseInt(hex, 16))
-        );
+        // Якщо це не валідний повний JSON — просто виводимо декодований текст
+        outputEl.value = raw;
       }
     }
 
-    // Обробка файлів
+    // Drag and Drop
     const fileInput = document.getElementById('fileInput');
     const dropArea = document.getElementById('dropArea');
 
@@ -325,12 +363,11 @@
       const reader = new FileReader();
       reader.onload = (e) => {
         inputEl.value = e.target.result;
-        decode();
+        processText();
       };
       reader.readAsText(file);
     }
 
-    // Допоміжні дії
     function clearInput() {
       inputEl.value = '';
       outputEl.value = '';
@@ -350,10 +387,14 @@
 
     function downloadResult() {
       if (!outputEl.value) return;
-      const blob = new Blob([outputEl.value], { type: 'application/json;charset=utf-8' });
+      const isJson = formatSelect.value === 'raw_json';
+      const filename = isJson ? 'clean_subtitles.json' : 'subtitles_with_timestamps.txt';
+      const type = isJson ? 'application/json;charset=utf-8' : 'text/plain;charset=utf-8';
+
+      const blob = new Blob([outputEl.value], { type });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = 'decoded_timestamps.json';
+      a.download = filename;
       a.click();
       URL.revokeObjectURL(a.href);
     }
