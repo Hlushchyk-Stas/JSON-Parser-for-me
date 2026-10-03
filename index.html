@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Unicode Декодер у Кирилицю</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card-bg: #111827;
+      --border: #1f2937;
+      --text: #f3f4f6;
+      --text-muted: #9ca3af;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --success: #10b981;
+      --font-main: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    [data-theme="light"] {
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --success: #059669;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+    }
+
+    body {
+      font-family: var(--font-main);
+      background-color: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1080px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 8px;
+    }
+
+    .title-group h1 {
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    .title-group p {
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .theme-btn {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Drag & Drop Zone */
+    .dropzone {
+      border: 2px dashed var(--border);
+      background: var(--card-bg);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .dropzone:hover, .dropzone.dragover {
+      border-color: var(--primary);
+    }
+
+    .dropzone input {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+
+    .dropzone-text {
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+
+    .dropzone-text b {
+      color: var(--primary);
+    }
+
+    /* Grid Layout */
+    .editor-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    @media (max-width: 768px) {
+      .editor-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .card-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-action {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .btn-action:hover {
+      border-color: var(--text-muted);
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    textarea {
+      width: 100%;
+      height: 380px;
+      border: none;
+      background: transparent;
+      padding: 16px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--text);
+      resize: vertical;
+      outline: none;
+    }
+
+    textarea::placeholder {
+      color: var(--text-muted);
+      opacity: 0.5;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--success);
+      color: white;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      opacity: 0;
+      transform: translateY(10px);
+      transition: all 0.2s ease;
+      pointer-events: none;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <div class="title-group">
+        <h1>Декодер Unicode-послідовностей</h1>
+        <p>Миттєве перетворення <code>\u04XX</code> у нормальні літери кирилиці</p>
+      </div>
+      <button class="theme-btn" id="themeToggle" onclick="toggleTheme()">🌓 Тема</button>
+    </header>
+
+    <div class="dropzone" id="dropArea">
+      <input type="file" id="fileInput" accept=".json,.txt">
+      <div class="dropzone-text">
+        Перетягніть файл <b>timestamps.json</b> сюди або <b>натисніть для вибору</b>
+      </div>
+    </div>
+
+    <div class="editor-grid">
+      <!-- Вхідні дані -->
+      <div class="card">
+        <div class="card-header">
+          <span>Вхідний JSON / Текст</span>
+          <div class="actions">
+            <button class="btn-action" onclick="clearInput()">Очистити</button>
+          </div>
+        </div>
+        <textarea id="inputText" placeholder='Вставте сюди текст на зразок: {"text": "\u0414\u043e\u0431\u0440\u043e"}'></textarea>
+      </div>
+
+      <!-- Результат -->
+      <div class="card">
+        <div class="card-header">
+          <span>Результат (Кирилиця)</span>
+          <div class="actions">
+            <button class="btn-action" onclick="copyResult()">Скопіювати</button>
+            <button class="btn-action" onclick="downloadResult()">Зберегти файл</button>
+          </div>
+        </div>
+        <textarea id="outputText" readonly placeholder="Розкодований результат з'явиться тут автоматично..."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast">Скопійовано в буфер обміну!</div>
+
+  <script>
+    const inputEl = document.getElementById('inputText');
+    const outputEl = document.getElementById('outputText');
+    const toastEl = document.getElementById('toast');
+
+    // Автоматичне декодування під час введення
+    inputEl.addEventListener('input', decode);
+
+    function decode() {
+      const val = inputEl.value;
+      if (!val.trim()) {
+        outputEl.value = '';
+        return;
+      }
+
+      try {
+        // Якщо передано валідний JSON
+        const parsed = JSON.parse(val);
+        outputEl.value = JSON.stringify(parsed, null, 2);
+      } catch (e) {
+        // Якщо це не повний JSON, а фрагмент тексту з \uXXXX
+        outputEl.value = val.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) => 
+          String.fromCharCode(parseInt(hex, 16))
+        );
+      }
+    }
+
+    // Обробка файлів
+    const fileInput = document.getElementById('fileInput');
+    const dropArea = document.getElementById('dropArea');
+
+    fileInput.addEventListener('change', (e) => loadFile(e.target.files[0]));
+
+    ['dragenter', 'dragover'].forEach(name => {
+      dropArea.addEventListener(name, (e) => {
+        e.preventDefault();
+        dropArea.classList.add('dragover');
+      });
+    });
+
+    ['dragleave', 'drop'].forEach(name => {
+      dropArea.addEventListener(name, (e) => {
+        e.preventDefault();
+        dropArea.classList.remove('dragover');
+      });
+    });
+
+    dropArea.addEventListener('drop', (e) => {
+      const file = e.dataTransfer.files[0];
+      if (file) loadFile(file);
+    });
+
+    function loadFile(file) {
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        inputEl.value = e.target.result;
+        decode();
+      };
+      reader.readAsText(file);
+    }
+
+    // Допоміжні дії
+    function clearInput() {
+      inputEl.value = '';
+      outputEl.value = '';
+    }
+
+    function showToast(msg) {
+      toastEl.textContent = msg;
+      toastEl.classList.add('show');
+      setTimeout(() => toastEl.classList.remove('show'), 2000);
+    }
+
+    function copyResult() {
+      if (!outputEl.value) return;
+      navigator.clipboard.writeText(outputEl.value);
+      showToast('Скопійовано!');
+    }
+
+    function downloadResult() {
+      if (!outputEl.value) return;
+      const blob = new Blob([outputEl.value], { type: 'application/json;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'decoded_timestamps.json';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme');
+      document.documentElement.setAttribute('data-theme', current === 'light' ? 'dark' : 'light');
+    }
+  </script>
+</body>
+</html>
